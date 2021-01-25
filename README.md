@@ -1,3 +1,7 @@
+# MoneyLion forked Instabug
+MoneyLion forked version for patching typings and handling error to avoid crashes and silent warning. It is used in MoneyLion **mobile-app**.
+See diff [InstaBugUtil & index.d.ts](https://github.com/Instabug/Instabug-React-Native/compare/master...MoneyLion:master)
+
 # Instabug for React Native
 
 [![npm](https://img.shields.io/npm/v/instabug-reactnative.svg)](https://www.npmjs.com/package/instabug-reactnative)
