@@ -38,6 +38,15 @@ RCT_EXPORT_MODULE(Instabug)
 }
 
 RCT_EXPORT_METHOD(startWithToken:(NSString *)token invocationEvents:(NSArray*)invocationEventsArray) {
+     SEL setPrivateApiSEL = NSSelectorFromString(@"setCurrentPlatform:");
+    if ([[Instabug class] respondsToSelector:setPrivateApiSEL]) {
+        NSInteger *platform = IBGPlatformReactNative;
+        NSInvocation *inv = [NSInvocation invocationWithMethodSignature:[[Instabug class] methodSignatureForSelector:setPrivateApiSEL]];
+        [inv setSelector:setPrivateApiSEL];
+        [inv setTarget:[Instabug class]];
+        [inv setArgument:&(platform) atIndex:2];
+        [inv invoke];
+    }
     IBGInvocationEvent invocationEvents = 0;
     NSLog(@"invocation events: %ld",(long)invocationEvents);
     for (NSNumber *boxedValue in invocationEventsArray) {
@@ -48,14 +57,7 @@ RCT_EXPORT_METHOD(startWithToken:(NSString *)token invocationEvents:(NSArray*)in
     RCTAddLogFunction(InstabugReactLogFunction);
     RCTSetLogThreshold(RCTLogLevelInfo);
     
-    SEL setCrossPlatformSEL = NSSelectorFromString(@"setCrossPlatform:");
-    if ([[Instabug class] respondsToSelector:setCrossPlatformSEL]) {
-        [[Instabug class] performSelector:setCrossPlatformSEL withObject:@(true)];
-    }
-    
-    IBGNetworkLogger.enabled = YES;
-    [self setBaseUrlForDeprecationLogs];
-    
+    IBGNetworkLogger.enabled = YES;    
 }
 
 RCT_EXPORT_METHOD(callPrivateApi:(NSString *)apiName apiParam: (NSString *) param) {
@@ -115,11 +117,10 @@ RCT_EXPORT_METHOD(setCrashReportingEnabled:(BOOL)enabledCrashReporter) {
     }
 }
 
-void (^globalReportCompletionHandler)(IBGReport *);
 IBGReport *currentReport = nil;
 RCT_EXPORT_METHOD(setPreSendingHandler:(RCTResponseSenderBlock)callBack) {
     if (callBack != nil) {
-        [Instabug setWillSendReportHandler_private:^(IBGReport *report, void (^reportCompletionHandler)(IBGReport *)) {
+        Instabug.willSendReportHandler = ^IBGReport * _Nonnull(IBGReport * _Nonnull report) {
             NSArray *tagsArray = report.tags;
             NSArray *instabugLogs= report.instabugLogs;
             NSArray *consoleLogs= report.consoleLogs;
@@ -127,9 +128,10 @@ RCT_EXPORT_METHOD(setPreSendingHandler:(RCTResponseSenderBlock)callBack) {
             NSArray *fileAttachments= report.fileLocations;
             NSDictionary *dict = @{ @"tagsArray" : tagsArray, @"instabugLogs" : instabugLogs, @"consoleLogs" : consoleLogs,       @"userAttributes" : userAttributes, @"fileAttachments" : fileAttachments};
             [self sendEventWithName:@"IBGpreSendingHandler" body:dict];
+
             currentReport = report;
-            globalReportCompletionHandler = reportCompletionHandler;
-        }];
+            return report;
+        };
     } else {
         Instabug.willSendReportHandler = nil;
     }
@@ -197,11 +199,6 @@ RCT_EXPORT_METHOD(addFileAttachmentWithDataToReport:(NSString*) dataString) {
     }
 }
 
-RCT_EXPORT_METHOD(submitReport) {
-    globalReportCompletionHandler(currentReport);
-    currentReport = nil;
-}
-
 RCT_EXPORT_METHOD(setSdkDebugLogsLevel:(IBGSDKDebugLogsLevel)sdkDebugLogsLevel) {
     [Instabug setSdkDebugLogsLevel:sdkDebugLogsLevel];
 }
@@ -255,7 +252,11 @@ RCT_EXPORT_METHOD(setUserAttribute:(NSString *)key withValue:(NSString *)value) 
 }
 
 RCT_EXPORT_METHOD(getUserAttribute:(NSString *)key callback:(RCTResponseSenderBlock)callback) {
+    @try {
     callback(@[[Instabug userAttributeForKey:key]]);
+    } @catch (NSException *exception) {
+        callback(@[[NSNull null]]);
+    }
 }
 
 RCT_EXPORT_METHOD(removeUserAttribute:(NSString *)key) {
@@ -386,6 +387,17 @@ RCT_EXPORT_METHOD(show) {
     [[NSRunLoop mainRunLoop] performSelector:@selector(show) target:[Instabug class] argument:nil order:0 modes:@[NSDefaultRunLoopMode]];
 }
 
+RCT_EXPORT_METHOD(reportScreenChange:(NSString *)screenName) {
+    SEL setPrivateApiSEL = NSSelectorFromString(@"logViewDidAppearEvent:");
+    if ([[Instabug class] respondsToSelector:setPrivateApiSEL]) {
+        NSInvocation *inv = [NSInvocation invocationWithMethodSignature:[[Instabug class] methodSignatureForSelector:setPrivateApiSEL]];
+        [inv setSelector:setPrivateApiSEL];
+        [inv setTarget:[Instabug class]];
+        [inv setArgument:&(screenName) atIndex:2];
+        [inv invoke];
+    }
+}
+
 - (NSDictionary *)constantsToExport
 {
     return @{ @"invocationEventNone" : @(IBGInvocationEventNone),
@@ -434,6 +446,7 @@ RCT_EXPORT_METHOD(show) {
               @"addCommentToFeature": @(IBGActionAddCommentToFeature),
               
               @"localeArabic": @(IBGLocaleArabic),
+              @"localeAzerbaijani": @(IBGLocaleAzerbaijani),
               @"localeChineseSimplified": @(IBGLocaleChineseSimplified),
               @"localeChineseTraditional": @(IBGLocaleChineseTraditional),
               @"localeCzech": @(IBGLocaleCzech),

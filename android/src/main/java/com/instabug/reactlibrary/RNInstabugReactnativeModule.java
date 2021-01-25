@@ -2,6 +2,7 @@ package com.instabug.reactlibrary;
 
 import android.annotation.SuppressLint;
 import android.app.Application;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -103,6 +104,7 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
     private final String FLOATING_BUTTON_EDGE_LEFT = "left";
     //locales
     private final String LOCALE_ARABIC = "arabic";
+    private final String LOCALE_AZERBAIJANI = "azerbaijani";
     private final String LOCALE_CHINESE_SIMPLIFIED = "chineseSimplified";
     private final String LOCALE_CHINESE_TRADITIONAL = "chineseTraditional";
     private final String LOCALE_CZECH = "czech";
@@ -1367,7 +1369,7 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
         MainThreadHandler.runOnMainThread(new Runnable() {
             @Override
             public void run() {
-                Report.OnReportCreatedListener listener = new Report.OnReportCreatedListener() {
+                Instabug.onReportSubmitHandler(new Report.OnReportCreatedListener() {
                     @Override
                     public void onReportCreated(Report report) {
                         WritableMap reportParam = Arguments.createMap();
@@ -1379,18 +1381,7 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
                         sendEvent(getReactApplicationContext(), "IBGpreSendingHandler", reportParam);
                         currentReport = report;
                     }
-                };
-
-                Method method = getMethod(Instabug.class, "onReportSubmitHandler_Private", Report.OnReportCreatedListener.class);
-                if (method != null) {
-                    try {
-                        method.invoke(null, listener);
-                    } catch (IllegalAccessException e) {
-                        e.printStackTrace();
-                    } catch (InvocationTargetException e) {
-                        e.printStackTrace();
-                    }
-                }
+                });
             }
         });
 
@@ -1467,21 +1458,7 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
         }
     }
 
-    @ReactMethod
-    public void submitReport() {
-        Method method = getMethod(Instabug.class, "setReport", Report.class);
-        if (method != null) {
-            try {
-                method.invoke(null, currentReport);
-                currentReport = null;
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
+    
     @ReactMethod
     public void getReport(Promise promise) {
         try {
@@ -1682,7 +1659,7 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
         });
     }
 
-    /**
+ /**
      * Sets whether user steps tracking is visual, non visual or disabled.
      *
      * @param reproStepsMode A string to set user steps tracking to be
@@ -1694,17 +1671,7 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
             @Override
             public void run() {
                 try {
-                    switch (reproStepsMode) {
-                        case ENABLED_WITH_NO_SCREENSHOTS:
-                            Instabug.setReproStepsState(State.ENABLED_WITH_NO_SCREENSHOTS);
-                            break;
-                        case DISABLED:
-                            Instabug.setReproStepsState(State.DISABLED);
-                            break;
-                        default:
-                            Instabug.setReproStepsState(State.ENABLED);
-                    }
-
+                    Instabug.setReproStepsState( ArgsRegistry.getDeserializedValue(reproStepsMode, State.class));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -2247,6 +2214,29 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
         });
     }
 
+    /**
+     * Reports that the screen has been changed (Repro Steps) the screen sent to this method will be the 'current view' on the dashboard
+     *
+     * @param screenName string containing the screen name
+     *
+     */
+    @ReactMethod
+    public void reportScreenChange(final String screenName) {
+        MainThreadHandler.runOnMainThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Method method = getMethod(Class.forName("com.instabug.library.Instabug"), "reportScreenChange", Bitmap.class, String.class);
+                    if (method != null) {
+                        method.invoke(null , null, screenName);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
     private InstabugCustomTextPlaceHolder.Key getStringToKeyConstant(String key) {
         switch (key) {
             case SHAKE_HINT:
@@ -2393,6 +2383,7 @@ public class RNInstabugReactnativeModule extends ReactContextBaseJavaModule {
         constants.put(BUG_REPORTING_REPORT_TYPE_QUESTION, BUG_REPORTING_REPORT_TYPE_QUESTION);
 
         constants.put("localeArabic", LOCALE_ARABIC);
+        constants.put("localeAzerbaijani", LOCALE_AZERBAIJANI);
         constants.put("localeChineseSimplified", LOCALE_CHINESE_SIMPLIFIED);
         constants.put("localeChineseTraditional", LOCALE_CHINESE_TRADITIONAL);
         constants.put("localeCzech", LOCALE_CZECH);

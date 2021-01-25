@@ -20,6 +20,10 @@ import NetworkLogger from './modules/NetworkLogger';
 InstabugUtils.captureJsErrors();
 NetworkLogger.setEnabled(true);
 
+var _currentScreen = null;
+var _lastScreen = null;
+var _isFirstScreen = false;
+const firstScreen = "Initial Screen";
 /**
  * Instabug
  * @exports Instabug
@@ -52,8 +56,18 @@ const InstabugModule = {
    * @param {invocationEvent} invocationEvent The event that invokes
    * the SDK's UI.
    */
-  start: function(token, invocationEvent) {
-    if (Platform.OS === 'ios') Instabug.startWithToken(token, invocationEvent);
+  start: function (token, invocationEvent) {
+    if (Platform.OS === 'ios') {
+      Instabug.startWithToken(token, invocationEvent);
+    }
+    _isFirstScreen = true;
+    _currentScreen = firstScreen;
+    setTimeout(function () {
+      if (_currentScreen == firstScreen) {
+        Instabug.reportScreenChange(firstScreen);
+        _currentScreen = null;
+      }
+    }, 1000);
   },
 
   /**
@@ -151,7 +165,9 @@ const InstabugModule = {
    *
    */
   setSdkDebugLogsLevel(sdkDebugLogsLevel) {
-    Instabug.setSdkDebugLogsLevel(sdkDebugLogsLevel);
+    if (Platform.OS === 'ios') {
+      Instabug.setSdkDebugLogsLevel(sdkDebugLogsLevel);
+    }
   },
 
   /* istanbul ignore next */
@@ -176,7 +192,7 @@ const InstabugModule = {
    * notifications are enabled or disabled.
    */
   setPushNotificationsEnabled(isPushNotificationEnabled) {
-      Replies.setPushNotificationsEnabled(isPushNotificationEnabled);
+    Replies.setPushNotificationsEnabled(isPushNotificationEnabled);
   },
 
   /* istanbul ignore next */
@@ -207,7 +223,7 @@ const InstabugModule = {
    * floating button.
    */
   setFloatingButtonEdge(floatingButtonEdge, offsetFromTop) {
-      BugReporting.setFloatingButtonEdge(floatingButtonEdge, offsetFromTop); 
+    BugReporting.setFloatingButtonEdge(floatingButtonEdge, offsetFromTop);
   },
 
   /**
@@ -737,35 +753,34 @@ const InstabugModule = {
       const { tags, consoleLogs, instabugLogs, userAttributes, fileAttachments } = report;
       const reportObj = new Report(tags, consoleLogs, instabugLogs, userAttributes, fileAttachments);
       preSendingHandler(reportObj);
-      Instabug.submitReport();
 
     });
 
     // handled js crash
     if (Platform.OS === 'android') {
       IBGEventEmitter.addListener(Instabug, InstabugConstants.SEND_HANDLED_CRASH, async jsonObject => {
-          try {
-            let report = await Instabug.getReport();
-            const { tags, consoleLogs, instabugLogs, userAttributes, fileAttachments } = report;
-            const reportObj = new Report(tags, consoleLogs, instabugLogs, userAttributes, fileAttachments);
-            preSendingHandler(reportObj);
-            Instabug.sendHandledJSCrash(JSON.stringify(jsonObject));
-          } catch (e) {
-            console.error(e);
-          }
+        try {
+          let report = await Instabug.getReport();
+          const { tags, consoleLogs, instabugLogs, userAttributes, fileAttachments } = report;
+          const reportObj = new Report(tags, consoleLogs, instabugLogs, userAttributes, fileAttachments);
+          preSendingHandler(reportObj);
+          Instabug.sendHandledJSCrash(JSON.stringify(jsonObject));
+        } catch (e) {
+          console.error(e);
+        }
       });
     }
 
     if (Platform.OS === 'android') {
       IBGEventEmitter.addListener(Instabug, InstabugConstants.SEND_UNHANDLED_CRASH, async (jsonObject) => {
-        
-          let report = await Instabug.getReport();
-          const { tags, consoleLogs, instabugLogs, userAttributes, fileAttachments } = report;
-          const reportObj = new Report(tags, consoleLogs, instabugLogs, userAttributes, fileAttachments);
-          preSendingHandler(reportObj);
-          Instabug.sendJSCrash(JSON.stringify(jsonObject));
+
+        let report = await Instabug.getReport();
+        const { tags, consoleLogs, instabugLogs, userAttributes, fileAttachments } = report;
+        const reportObj = new Report(tags, consoleLogs, instabugLogs, userAttributes, fileAttachments);
+        preSendingHandler(reportObj);
+        Instabug.sendJSCrash(JSON.stringify(jsonObject));
       });
-    } 
+    }
 
     Instabug.setPreSendingHandler(preSendingHandler);
   },
@@ -773,6 +788,57 @@ const InstabugModule = {
   callPrivateApi(apiName, param) {
     Instabug.callPrivateApi(apiName, param);
   },
+
+  onNavigationStateChange(prevState, currentState, action) {
+    const currentScreen = InstabugUtils.getActiveRouteName(currentState);
+    const prevScreen = InstabugUtils.getActiveRouteName(prevState);
+
+    if (prevScreen !== currentScreen) {
+      if (_currentScreen != null && _currentScreen != firstScreen) {
+        Instabug.reportScreenChange(_currentScreen);
+        _currentScreen = null;
+      }
+      _currentScreen = currentScreen;
+      setTimeout(function () {
+        if (_currentScreen == currentScreen) {
+          Instabug.reportScreenChange(currentScreen);
+          _currentScreen = null;
+        }
+      }, 1000);
+    }
+  },
+
+  onStateChange(state) {
+    const currentScreen = InstabugUtils.getFullRoute(state);
+    if (_currentScreen != null && _currentScreen != firstScreen) {
+      Instabug.reportScreenChange(_currentScreen);
+      _currentScreen = null;
+    }
+    _currentScreen = currentScreen;
+    setTimeout(function () {
+      if (_currentScreen == currentScreen) {
+        Instabug.reportScreenChange(currentScreen);
+        _currentScreen = null;
+      }
+    }, 1000);
+  },
+
+  reportScreenChange(screenName) {
+    Instabug.reportScreenChange(screenName);
+  },
+
+  componentDidAppearListener({ componentId, componentName, passProps }) {
+    if (_isFirstScreen) {
+      _lastScreen = componentName;
+      _isFirstScreen = false;
+      return;
+    }
+    if (_lastScreen != componentName) {
+      Instabug.reportScreenChange(componentName);
+      _lastScreen = componentName;
+    }
+  },
+
 
   /**
    * The event used to invoke the feedback form
@@ -852,6 +918,7 @@ const InstabugModule = {
    */
   locale: {
     arabic: Instabug.localeArabic,
+    azerbaijani: Instabug.localeAzerbaijani,
     chineseSimplified: Instabug.localeChineseSimplified,
     chineseTraditional: Instabug.localeChineseTraditional,
     czech: Instabug.localeCzech,
